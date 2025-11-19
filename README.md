@@ -28,7 +28,7 @@ npm i @wxn0brp/gloves-link-client
 ## Usage
 
 ```typescript
-import GlovesLinkClient from '@wxn0brp/gloves-link/client';
+import GlovesLinkClient from '@wxn0brp/gloves-link-client';
 //or browser
 import GlovesLinkClient from 'path/to/your/GlovesLinkClient.js';
 // if you use falcon-frame

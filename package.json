@@ -1,0 +1,39 @@
+{
+  "name": "@wxn0brp/gloves-link-client",
+  "version": "0.0.4",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "wxn0brP",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wxn0brP/GlovesLink-client.git"
+  },
+  "homepage": "https://github.com/wxn0brP/GlovesLink",
+  "devDependencies": {
+    "@types/bun": "*",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^*",
+    "tsc-alias": "*",
+    "typescript": "*"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    }
+  }
+}

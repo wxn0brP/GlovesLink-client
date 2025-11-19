@@ -24,6 +24,9 @@
     "dependencies": {
         "ws": "^8.18.3"
     },
+    "files": [
+        "dist"
+    ],
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

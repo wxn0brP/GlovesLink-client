@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.6](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.5...v0.0.6) (2025-11-20)
+
+
+### Bug Fixes
+
+* on message ([269157f](https://github.com/wxn0brP/GlovesLink-client/commit/269157f8fcfa5b4e970468e70d79d360c7966d53))
+
 ### [0.0.5](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.4...v0.0.5) (2025-11-20)
 
 

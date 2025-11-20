@@ -22,6 +22,7 @@
         "typescript": "*"
     },
     "dependencies": {
+        "@wxn0brp/event-emitter": "^0.0.4",
         "ws": "^8.18.3"
     },
     "files": [

@@ -1,3 +1,4 @@
+import VEE, { EventArgs, EventMap, EventName } from "@wxn0brp/event-emitter";
 import WebSocketImpl from "./universal";
 
 export interface GLC_Opts {
@@ -18,18 +19,26 @@ export interface GLC_AckEvent {
     data: any[];
 }
 
-export class GlovesLinkClient {
+export type InternalEvents = {
+    connect: (ws: WebSocket) => void;
+    error: (...err: any[]) => void;
+    disconnect: (ws: WebSocket, event: CloseEvent) => void;
+    unauthorized: (ws: WebSocket) => void;
+    forbidden: (ws: WebSocket) => void;
+    serverError: (ws: WebSocket) => void;
+}
+
+export class GlovesLinkClient<T extends EventMap = {}> {
     public ws: WebSocket;
     public ackIdCounter: number;
     public ackCallbacks: Map<number, Function>;
-    public handlers: { [key: string]: Function };
+    public handlers = new VEE<T>();
     public opts: GLC_Opts;
     public url: URL;
 
     constructor(url: string, opts: Partial<GLC_Opts> = {}) {
         this.ackIdCounter = 1;
         this.ackCallbacks = new Map();
-        this.handlers = {};
         this.opts = {
             logs: false,
             reConnect: true,
@@ -51,12 +60,14 @@ export class GlovesLinkClient {
 
         this.ws.onopen = () => {
             if (this.opts.logs) console.log("[ws] Connected");
-            this.handlers.connect?.(this.ws);
+            // @ts-ignore
+            this.handlers.emit("connect", this.ws);
         }
 
         this.ws.onerror = (...err: any) => {
             if (this.opts.logs) console.warn("[ws] Error:", err);
-            this.handlers.error?.(...err);
+            // @ts-ignore
+            this.handlers.emit("error", ...err);
         }
 
         this.ws.onmessage = (_data) => {
@@ -98,15 +109,14 @@ export class GlovesLinkClient {
                 }
             }
 
-            const handler = this.handlers[evt];
-            if (!handler) return;
-
-            handler(...data);
+            // @ts-ignore
+            this.publicHandlers.emit(evt, ...data);
         }
 
         this.ws.onclose = (event: CloseEvent) => {
             if (this.opts.logs) console.log("[ws] Disconnected", event);
-            this.handlers.disconnect?.(this.ws, event);
+            // @ts-ignore
+            this.handlers.emit("disconnect", this.ws, event);
 
             if (event.code === 1006) {
                 if (this.opts.logs) console.log("[ws] Connection closed by server");
@@ -117,9 +127,12 @@ export class GlovesLinkClient {
                     }
                     const status = data.status as number;
                     if (this.opts.logs) console.log("[ws] Status", status);
-                    if (status === 401) this.handlers.unauthorized?.(this.ws);
-                    else if (status === 403) this.handlers.forbidden?.(this.ws);
-                    else if (status === 500) this.handlers.serverError?.(this.ws);
+                    // @ts-ignore
+                    if (status === 401) this.handlers.emit("unauthorized", this.ws);
+                    // @ts-ignore
+                    else if (status === 403) this.handlers.emit("forbidden", this.ws);
+                    // @ts-ignore
+                    else if (status === 500) this.handlers.emit("serverError", this.ws);
                 })
                 return;
             }
@@ -131,8 +144,12 @@ export class GlovesLinkClient {
         }
     }
 
-    on(evt: string, handler: (...args: any[]) => void | any) {
-        this.handlers[evt] = handler;
+    on<K extends EventName<T & InternalEvents>>(event: K, listener: (...args: EventArgs<T & InternalEvents, K>) => void) {
+        this.handlers.on(event, listener as any);
+    }
+
+    once<K extends EventName<T & InternalEvents>>(event: K, listener: (...args: EventArgs<T & InternalEvents, K>) => void) {
+        this.handlers.once(event, listener as any);
     }
 
     emit(evt: string, ...args: any[]) {

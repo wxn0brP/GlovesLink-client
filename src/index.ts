@@ -28,11 +28,11 @@ export type InternalEvents = {
     serverError: (ws: WebSocket) => void;
 }
 
-export class GlovesLinkClient<T extends EventMap = {}> {
+export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents extends EventMap = {}> {
     public ws: WebSocket;
     public ackIdCounter: number;
     public ackCallbacks: Map<number, Function>;
-    public handlers = new VEE<T>();
+    public handlers = new VEE<InputEvents>();
     public opts: GLC_Opts;
     public url: URL;
 
@@ -144,15 +144,15 @@ export class GlovesLinkClient<T extends EventMap = {}> {
         }
     }
 
-    on<K extends EventName<T & InternalEvents>>(event: K, listener: (...args: EventArgs<T & InternalEvents, K>) => void) {
+    on<K extends EventName<InputEvents & InternalEvents>>(event: K, listener: (InputEvents & InternalEvents)[K]) {
         this.handlers.on(event, listener as any);
     }
 
-    once<K extends EventName<T & InternalEvents>>(event: K, listener: (...args: EventArgs<T & InternalEvents, K>) => void) {
+    once<K extends EventName<InputEvents & InternalEvents>>(event: K, listener: (InputEvents & InternalEvents)[K]) {
         this.handlers.once(event, listener as any);
     }
 
-    emit(evt: string, ...args: any[]) {
+    emit<K extends EventName<OutputEvents>>(evt: K, ...args: EventArgs<OutputEvents, K>) {
         const ackI = args.map((data, i) => {
             if (typeof data === "function") return i;
         }).filter(i => i !== undefined);
@@ -171,7 +171,7 @@ export class GlovesLinkClient<T extends EventMap = {}> {
         }));
     }
 
-    send(evt: string, ...args: any[]) {
+    send<K extends EventName<OutputEvents>>(evt: K, ...args: EventArgs<OutputEvents, K>) {
         return this.emit(evt, ...args);
     }
 

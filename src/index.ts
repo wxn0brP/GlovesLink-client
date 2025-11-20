@@ -110,7 +110,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             }
 
             // @ts-ignore
-            this.publicHandlers.emit(evt, ...data);
+            this.handlers.emit(evt, ...data);
         }
 
         this.ws.onclose = (event: CloseEvent) => {

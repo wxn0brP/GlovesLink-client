@@ -142,14 +142,14 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
                     return;
                 }
 
-                const status = data.status as number;
+                const status = data.status as { status: number, msg?: string };
                 if (this.opts.logs) console.log("[ws] Status", status);
                 // @ts-ignore
-                if (status === 401) this.handlers.emit("unauthorized", this.ws);
+                if (status.status === 401) this.handlers.emit("unauthorized", this.ws);
                 // @ts-ignore
-                else if (status === 403) this.handlers.emit("forbidden", this.ws);
+                else if (status.status === 403) this.handlers.emit("forbidden", this.ws);
                 // @ts-ignore
-                else if (status === 500) this.handlers.emit("serverError", this.ws);
+                else if (status.status === 500) this.handlers.emit("serverError", this.ws);
 
                 return;
             }

@@ -1,5 +1,4 @@
 import VEE, { EventArgs, EventMap, EventName } from "@wxn0brp/event-emitter";
-import WebSocketImpl from "./universal";
 
 export interface GLC_Opts {
     reConnect: boolean,
@@ -61,7 +60,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         this._manuallyDisconnected = false;
         const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
         this.url.searchParams.set("id", id);
-        this.ws = new WebSocketImpl(this.url.href);
+        this.ws = new WebSocket(this.url.href);
 
         this.ws.onopen = () => {
             this.connected = true;

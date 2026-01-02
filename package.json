@@ -16,14 +16,12 @@
     },
     "devDependencies": {
         "@types/bun": "*",
-        "@types/ws": "^8.18.1",
-        "esbuild": "^*",
+        "esbuild": "*",
         "tsc-alias": "*",
         "typescript": "*"
     },
     "dependencies": {
-        "@wxn0brp/event-emitter": "^0.0.4",
-        "ws": "^8.18.3"
+        "@wxn0brp/event-emitter": "^0.0.4"
     },
     "files": [
         "dist"
@@ -39,5 +37,8 @@
             "import": "./dist/*.js",
             "default": "./dist/*.js"
         }
+    },
+    "engines": {
+        "node": ">=22.0.0"
     }
 }

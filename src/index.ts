@@ -6,6 +6,7 @@ export interface GLC_Opts {
     logs: boolean;
     token: string;
     autoConnect: boolean;
+    connectionData?: Record<string, any>;
 }
 
 export interface GLC_DataEvent {
@@ -61,6 +62,10 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         this._manuallyDisconnected = false;
         const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
         this.url.searchParams.set("id", id);
+
+        if (this.opts.connectionData)
+            this.url.searchParams.set("data", JSON.stringify(this.opts.connectionData));
+
         this.ws = new WebSocket(this.url.href);
 
         this.ws.onopen = () => {

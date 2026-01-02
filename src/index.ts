@@ -113,27 +113,33 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             this.handlers.emit(evt, ...data);
         }
 
-        this.ws.onclose = (event: CloseEvent) => {
+        this.ws.onclose = async (event: CloseEvent) => {
             if (this.opts.logs) console.log("[ws] Disconnected", event);
             // @ts-ignore
             this.handlers.emit("disconnect", this.ws, event);
 
             if (event.code === 1006) {
                 if (this.opts.logs) console.log("[ws] Connection closed by server");
-                fetch("/gloves-link/status?id=" + id).then(res => res.json()).then(data => {
-                    if (data.err) {
-                        if (this.opts.logs) console.log("[ws] Status error", data.msg);
-                        return;
-                    }
-                    const status = data.status as number;
-                    if (this.opts.logs) console.log("[ws] Status", status);
-                    // @ts-ignore
-                    if (status === 401) this.handlers.emit("unauthorized", this.ws);
-                    // @ts-ignore
-                    else if (status === 403) this.handlers.emit("forbidden", this.ws);
-                    // @ts-ignore
-                    else if (status === 500) this.handlers.emit("serverError", this.ws);
-                })
+
+                const params = new URLSearchParams();
+                params.set("id", id);
+                params.set("path", this.url.pathname);
+
+                const data = await fetch("/gloves-link/status?" + params.toString()).then(res => res.json());
+                if (data.err) {
+                    if (this.opts.logs) console.log("[ws] Status error", data.msg);
+                    return;
+                }
+
+                const status = data.status as number;
+                if (this.opts.logs) console.log("[ws] Status", status);
+                // @ts-ignore
+                if (status === 401) this.handlers.emit("unauthorized", this.ws);
+                // @ts-ignore
+                else if (status === 403) this.handlers.emit("forbidden", this.ws);
+                // @ts-ignore
+                else if (status === 500) this.handlers.emit("serverError", this.ws);
+
                 return;
             }
             if (!this.opts.reConnect) return;

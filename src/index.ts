@@ -6,6 +6,7 @@ export interface GLC_Opts {
     reConnectInterval: number,
     logs: boolean;
     token: string;
+    autoConnect: boolean;
 }
 
 export interface GLC_DataEvent {
@@ -35,6 +36,8 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
     public handlers = new VEE<InputEvents>();
     public opts: GLC_Opts;
     public url: URL;
+    public connected: boolean = false;
+    private _manuallyDisconnected: boolean = false;
 
     constructor(url: string, opts: Partial<GLC_Opts> = {}) {
         this.ackIdCounter = 1;
@@ -44,21 +47,24 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             reConnect: true,
             reConnectInterval: 1000,
             token: null,
+            autoConnect: true,
             ...opts
         }
 
         this.url = new URL(url, window ? window.location.href.replace("http", "ws") : "ws://localhost");
         if (this.opts.token) this.url.searchParams.set("token", this.opts.token);
 
-        this._connect();
+        if (this.opts.autoConnect) this.connect();
     }
 
-    _connect() {
+    connect() {
+        this._manuallyDisconnected = false;
         const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
         this.url.searchParams.set("id", id);
         this.ws = new WebSocketImpl(this.url.href);
 
         this.ws.onopen = () => {
+            this.connected = true;
             if (this.opts.logs) console.log("[ws] Connected");
             // @ts-ignore
             this.handlers.emit("connect", this.ws);
@@ -114,9 +120,15 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         }
 
         this.ws.onclose = async (event: CloseEvent) => {
+            this.connected = false;
             if (this.opts.logs) console.log("[ws] Disconnected", event);
             // @ts-ignore
             this.handlers.emit("disconnect", this.ws, event);
+
+            if (this._manuallyDisconnected) {
+                this._manuallyDisconnected = false;
+                return;
+            }
 
             if (event.code === 1006) {
                 if (this.opts.logs) console.log("[ws] Connection closed by server");
@@ -145,7 +157,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             if (!this.opts.reConnect) return;
 
             setTimeout(() => {
-                this._connect();
+                this.connect();
             }, this.opts.reConnectInterval);
         }
     }
@@ -179,6 +191,11 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
     send<K extends EventName<OutputEvents>>(evt: K, ...args: EventArgs<OutputEvents, K>) {
         return this.emit(evt, ...args);
+    }
+
+    disconnect() {
+        this._manuallyDisconnected = true;
+        this.ws.close();
     }
 
     close() {

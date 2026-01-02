@@ -24,9 +24,9 @@ export type InternalEvents = {
     connect: (ws: WebSocket) => void;
     error: (...err: any[]) => void;
     disconnect: (ws: WebSocket, event: CloseEvent) => void;
-    unauthorized: (ws: WebSocket) => void;
-    forbidden: (ws: WebSocket) => void;
-    serverError: (ws: WebSocket) => void;
+    connect_unauthorized: (ws: WebSocket, msg: string) => void;
+    connect_forbidden: (ws: WebSocket, msg: string) => void;
+    connect_serverError: (ws: WebSocket, msg: string) => void;
 }
 
 export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents extends EventMap = {}> {
@@ -77,14 +77,12 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
                 this.ws.send(msg);
             }
 
-            // @ts-ignore
-            this.handlers.emit("connect", this.ws);
+            this._handlersEmit("connect", this.ws);
         }
 
         this.ws.onerror = (...err: any) => {
             if (this.opts.logs) console.warn("[ws] Error:", err);
-            // @ts-ignore
-            this.handlers.emit("error", ...err);
+            this._handlersEmit("error", ...err);
         }
 
         this.ws.onmessage = (_data) => {
@@ -126,15 +124,13 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
                 }
             }
 
-            // @ts-ignore
-            this.handlers.emit(evt, ...data);
+            this._handlersEmit(evt, ...data);
         }
 
         this.ws.onclose = async (event: CloseEvent) => {
             this.connected = false;
             if (this.opts.logs) console.log("[ws] Disconnected", event);
-            // @ts-ignore
-            this.handlers.emit("disconnect", this.ws, event);
+            this._handlersEmit("disconnect", this.ws, event);
 
             if (this._manuallyDisconnected) {
                 this._manuallyDisconnected = false;
@@ -156,12 +152,9 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
                 const status = data.status as { status: number, msg?: string };
                 if (this.opts.logs) console.log("[ws] Status", status);
-                // @ts-ignore
-                if (status.status === 401) this.handlers.emit("unauthorized", this.ws);
-                // @ts-ignore
-                else if (status.status === 403) this.handlers.emit("forbidden", this.ws);
-                // @ts-ignore
-                else if (status.status === 500) this.handlers.emit("serverError", this.ws);
+                if (status.status === 401) this._handlersEmit("connect_unauthorized", this.ws, status.msg);
+                else if (status.status === 403) this._handlersEmit("connect_forbidden", this.ws, status.msg);
+                else if (status.status === 500) this._handlersEmit("connect_serverError", this.ws, status.msg);
 
                 return;
             }
@@ -216,6 +209,13 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
     close() {
         this.ws.close();
+    }
+
+    _handlersEmit(evtName: string, ...args: any[]) {
+        // @ts-ignore
+        this.handlers.emit(evtName, ...args);
+        // @ts-ignore
+        this.handlers.emit("*", evtName, ...args);
     }
 }
 

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.9](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.8...v0.0.9) (2026-01-02)
+
+
+### Features
+
+* connection data ([986a206](https://github.com/wxn0brP/GlovesLink-client/commit/986a206443a0dd79c3e48f753401add525a2220d))
+* message queue ([61fc18d](https://github.com/wxn0brP/GlovesLink-client/commit/61fc18decf2121d417f4f2665d0b0b9bd90abe6b))
+
 ### [0.0.8](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.7...v0.0.8) (2026-01-02)
 
 

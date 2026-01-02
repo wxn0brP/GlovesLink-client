@@ -37,6 +37,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
     public url: URL;
     public connected: boolean = false;
     private _manuallyDisconnected: boolean = false;
+    private messageQueue: string[] = [];
 
     constructor(url: string, opts: Partial<GLC_Opts> = {}) {
         this.ackIdCounter = 1;
@@ -65,6 +66,12 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         this.ws.onopen = () => {
             this.connected = true;
             if (this.opts.logs) console.log("[ws] Connected");
+
+            let msg: string;
+            while (msg = this.messageQueue.shift()) {
+                this.ws.send(msg);
+            }
+
             // @ts-ignore
             this.handlers.emit("connect", this.ws);
         }
@@ -181,11 +188,16 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             args[ackIndex] = ackId;
         }
 
-        this.ws.send(JSON.stringify({
+        const payload = JSON.stringify({
             evt,
             data: args || undefined,
             ackI: ackI.length ? ackI : undefined
-        }));
+        });
+
+        if (this.connected && this.ws?.readyState === WebSocket.OPEN)
+            this.ws.send(payload);
+        else
+            this.messageQueue.push(payload);
     }
 
     send<K extends EventName<OutputEvents>>(evt: K, ...args: EventArgs<OutputEvents, K>) {

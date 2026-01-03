@@ -23,10 +23,10 @@ export interface GLC_AckEvent {
 export type InternalEvents = {
     connect: (ws: WebSocket) => void;
     error: (...err: any[]) => void;
-    disconnect: (ws: WebSocket, event: CloseEvent) => void;
-    connect_unauthorized: (ws: WebSocket, msg: string) => void;
-    connect_forbidden: (ws: WebSocket, msg: string) => void;
-    connect_serverError: (ws: WebSocket, msg: string) => void;
+    disconnect: (event: CloseEvent) => void;
+    connect_unauthorized: (msg: string) => void;
+    connect_forbidden: (msg: string) => void;
+    connect_serverError: (msg: string) => void;
 }
 
 export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents extends EventMap = {}> {
@@ -77,7 +77,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
                 this.ws.send(msg);
             }
 
-            this._handlersEmit("connect", this.ws);
+            this._handlersEmit("connect");
         }
 
         this.ws.onerror = (...err: any) => {
@@ -130,7 +130,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         this.ws.onclose = async (event: CloseEvent) => {
             this.connected = false;
             if (this.opts.logs) console.log("[ws] Disconnected", event);
-            this._handlersEmit("disconnect", this.ws, event);
+            this._handlersEmit("disconnect", event);
 
             if (this._manuallyDisconnected) {
                 this._manuallyDisconnected = false;
@@ -152,9 +152,9 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
                 const status = data.status as { status: number, msg?: string };
                 if (this.opts.logs) console.log("[ws] Status", status);
-                if (status.status === 401) this._handlersEmit("connect_unauthorized", this.ws, status.msg);
-                else if (status.status === 403) this._handlersEmit("connect_forbidden", this.ws, status.msg);
-                else if (status.status === 500) this._handlersEmit("connect_serverError", this.ws, status.msg);
+                if (status.status === 401) this._handlersEmit("connect_unauthorized", status.msg);
+                else if (status.status === 403) this._handlersEmit("connect_forbidden", status.msg);
+                else if (status.status === 500) this._handlersEmit("connect_serverError", status.msg);
 
                 return;
             }

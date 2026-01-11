@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.12](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.11...v0.0.12) (2026-01-11)
+
+
+### Bug Fixes
+
+* handle get status error ([149a253](https://github.com/wxn0brP/GlovesLink-client/commit/149a2531ffa41ee1baf0a0937e895ba68ba54cdd))
+* node client ([b8b33ba](https://github.com/wxn0brP/GlovesLink-client/commit/b8b33baa2a03d4858470f09cc015c73686fde342))
+* node client err code ([79c82b6](https://github.com/wxn0brP/GlovesLink-client/commit/79c82b6be26355b2fbc9e24962114845ec37ea3d))
+
 ### [0.0.11](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.10...v0.0.11) (2026-01-03)
 
 

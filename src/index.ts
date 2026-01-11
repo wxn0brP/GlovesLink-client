@@ -144,7 +144,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
                 params.set("id", id);
                 params.set("path", this.url.pathname);
 
-                const data = await fetch("/gloves-link/status?" + params.toString()).then(res => res.json());
+                const data = await fetch(this.url.origin + "/gloves-link/status?" + params.toString()).then(res => res.json());
                 if (data.err) {
                     if (this.opts.logs) console.log("[ws] Status error", data.msg);
                     return;

@@ -52,7 +52,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             ...opts
         }
 
-        this.url = new URL(url, window ? window.location.href.replace("http", "ws") : "ws://localhost");
+        this.url = new URL(url, typeof window !== "undefined" ? window.location.href.replace("http", "ws") : "ws://localhost");
         if (this.opts.token) this.url.searchParams.set("token", this.opts.token);
 
         if (this.opts.autoConnect) this.connect();

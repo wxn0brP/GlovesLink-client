@@ -140,28 +140,15 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             if (event.code === 1006) {
                 if (this.opts.logs) console.log("[ws] Connection closed by server");
 
-                const params = new URLSearchParams();
-                params.set("id", id);
-                params.set("path", this.url.pathname);
-
-                const statusUrl = this.url.origin + "/gloves-link/status?" + params.toString();
-                const res = await fetch(statusUrl.replace("ws", "http"));
-                if (!res.ok) return console.error("[ws] Status error", res.status);
-
-                const data = await res.json();
-                if (data.err) {
-                    if (this.opts.logs) console.log("[ws] Status error", data.msg);
-                    return;
+                try {
+                    const canReconnect = await checkStatus(this, id);
+                    if (!canReconnect) return;
+                } catch (e) {
+                    if (this.opts.logs)
+                        console.error("[ws] Status error", e);
                 }
-
-                const status = data.status as { status: number, msg?: string };
-                if (this.opts.logs) console.log("[ws] Status", status);
-                if (status.status === 401) this._handlersEmit("connect_unauthorized", status.msg);
-                else if (status.status === 403) this._handlersEmit("connect_forbidden", status.msg);
-                else if (status.status === 500) this._handlersEmit("connect_serverError", status.msg);
-
-                return;
             }
+
             if (!this.opts.reConnect) return;
 
             setTimeout(() => {
@@ -221,6 +208,43 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         // @ts-ignore
         this.handlers.emit("*", evtName, ...args);
     }
+}
+
+async function checkStatus(client: GlovesLinkClient, id: string) {
+    const params = new URLSearchParams();
+    params.set("id", id);
+    params.set("path", client.url.pathname);
+
+    const statusUrl = client.url.origin + "/gloves-link/status?" + params.toString();
+    const res = await fetch(statusUrl.replace("ws", "http"));
+    if (!res.ok) {
+        console.error("[ws] Status error", res.status);
+        return true;
+    }
+
+    const data = await res.json();
+    if (data.err) {
+        if (client.opts.logs) console.log("[ws] Status error", data.msg);
+        return true;
+    }
+
+    const status = data.status as { status: number, msg?: string };
+    if (client.opts.logs) console.log("[ws] Status", status);
+
+    if (status.status === 401) {
+        client._handlersEmit("connect_unauthorized", status.msg);
+        return false;
+    }
+    else if (status.status === 403) {
+        client._handlersEmit("connect_forbidden", status.msg);
+        return false;
+    }
+    else if (status.status === 500) {
+        client._handlersEmit("connect_serverError", status.msg);
+        return false;
+    }
+
+    return true;
 }
 
 export {

@@ -30,19 +30,20 @@ export type InternalEvents = {
 }
 
 export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents extends EventMap = {}> {
-    public ws: WebSocket;
-    public ackIdCounter: number;
-    public ackCallbacks: Map<number, Function>;
-    public handlers = new VEE<InputEvents>();
-    public opts: GLC_Opts;
-    public url: URL;
-    public connected: boolean = false;
-    private _manuallyDisconnected: boolean = false;
-    private messageQueue: string[] = [];
+    _ws: WebSocket;
+    _ackIdCounter: number;
+    _ackCallbacks: Map<number, Function>;
+    _handlers = new VEE<InputEvents>();
+    _manuallyDisconnected: boolean = false;
+    _messageQueue: string[] = [];
+
+    opts: GLC_Opts;
+    url: URL;
+    connected: boolean = false;
 
     constructor(url: string, opts: Partial<GLC_Opts> = {}) {
-        this.ackIdCounter = 1;
-        this.ackCallbacks = new Map();
+        this._ackIdCounter = 1;
+        this._ackCallbacks = new Map();
         this.opts = {
             logs: false,
             reConnect: true,
@@ -66,26 +67,26 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         if (this.opts.connectionData)
             this.url.searchParams.set("data", JSON.stringify(this.opts.connectionData));
 
-        this.ws = new WebSocket(this.url.href);
+        this._ws = new WebSocket(this.url.href);
 
-        this.ws.onopen = () => {
+        this._ws.onopen = () => {
             this.connected = true;
             if (this.opts.logs) console.log("[ws] Connected");
 
             let msg: string;
-            while (msg = this.messageQueue.shift()) {
-                this.ws.send(msg);
+            while (msg = this._messageQueue.shift()) {
+                this._ws.send(msg);
             }
 
             this._handlersEmit("connect");
         }
 
-        this.ws.onerror = (...err: any) => {
+        this._ws.onerror = (...err: any) => {
             if (this.opts.logs) console.warn("[ws] Error:", err);
             this._handlersEmit("error", ...err);
         }
 
-        this.ws.onmessage = (_data) => {
+        this._ws.onmessage = (_data) => {
             const raw = _data?.data?.toString() || _data?.toString() || "";
             let msg: GLC_DataEvent | GLC_AckEvent;
 
@@ -98,9 +99,9 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
             if ("ack" in msg) {
                 const ackId = msg.ack;
-                const ackCallback = this.ackCallbacks.get(ackId);
+                const ackCallback = this._ackCallbacks.get(ackId);
                 if (ackCallback) {
-                    this.ackCallbacks.delete(ackId);
+                    this._ackCallbacks.delete(ackId);
                     ackCallback(...msg.data);
                 }
                 return;
@@ -116,7 +117,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
                     const ackId = data[ackIndex];
                     data[ackIndex] = (...res: any) => {
-                        this.ws.send(JSON.stringify({
+                        this._ws.send(JSON.stringify({
                             ack: ackId,
                             data: res
                         }));
@@ -127,15 +128,12 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             this._handlersEmit(evt, ...data);
         }
 
-        this.ws.onclose = async (event: CloseEvent) => {
+        this._ws.onclose = async (event: CloseEvent) => {
             this.connected = false;
             if (this.opts.logs) console.log("[ws] Disconnected", event);
             this._handlersEmit("disconnect", event);
 
-            if (this._manuallyDisconnected) {
-                this._manuallyDisconnected = false;
-                return;
-            }
+            if (this._manuallyDisconnected) return;
 
             if (event.code === 1006) {
                 if (this.opts.logs) console.log("[ws] Connection closed by server");
@@ -158,11 +156,11 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
     }
 
     on<K extends EventName<InputEvents & InternalEvents>>(event: K, listener: (InputEvents & InternalEvents)[K]) {
-        this.handlers.on(event, listener as any);
+        this._handlers.on(event, listener as any);
     }
 
     once<K extends EventName<InputEvents & InternalEvents>>(event: K, listener: (InputEvents & InternalEvents)[K]) {
-        this.handlers.once(event, listener as any);
+        this._handlers.once(event, listener as any);
     }
 
     emit<K extends EventName<OutputEvents>>(evt: K, ...args: EventArgs<OutputEvents, K>) {
@@ -172,8 +170,8 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
         for (let i = 0; i < ackI.length; i++) {
             const ackIndex = ackI[i];
-            const ackId = this.ackIdCounter++;
-            this.ackCallbacks.set(ackId, args[ackIndex]);
+            const ackId = this._ackIdCounter++;
+            this._ackCallbacks.set(ackId, args[ackIndex]);
             args[ackIndex] = ackId;
         }
 
@@ -183,10 +181,10 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             ackI: ackI.length ? ackI : undefined
         });
 
-        if (this.connected && this.ws?.readyState === WebSocket.OPEN)
-            this.ws.send(payload);
+        if (this.connected && this._ws?.readyState === WebSocket.OPEN)
+            this._ws.send(payload);
         else
-            this.messageQueue.push(payload);
+            this._messageQueue.push(payload);
     }
 
     send<K extends EventName<OutputEvents>>(evt: K, ...args: EventArgs<OutputEvents, K>) {
@@ -195,18 +193,18 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
     disconnect() {
         this._manuallyDisconnected = true;
-        this.ws.close();
+        this._ws.close();
     }
 
     close() {
-        this.ws.close();
+        this._ws.close();
     }
 
     _handlersEmit(evtName: string, ...args: any[]) {
         // @ts-ignore
-        this.handlers.emit(evtName, ...args);
+        this._handlers.emit(evtName, ...args);
         // @ts-ignore
-        this.handlers.emit("*", evtName, ...args);
+        this._handlers.emit("*", evtName, ...args);
     }
 }
 

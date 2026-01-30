@@ -1,12 +1,17 @@
 import VEE, { EventArgs, EventMap, EventName } from "@wxn0brp/event-emitter";
 
 export interface GLC_Opts {
-    reConnect: boolean,
-    reConnectInterval: number,
     logs: boolean;
     token: string;
     autoConnect: boolean;
     connectionData?: Record<string, any>;
+    statusPath: string;
+    reConnect: boolean,
+    reConnectInterval: number,
+    reConnectBackoffFactor: number;
+    maxReConnectAttempts: number;
+    /** Note: without jitter */
+    maxReConnectDelay: number;
 }
 
 export interface GLC_DataEvent {
@@ -27,6 +32,7 @@ export type InternalEvents = {
     connect_unauthorized: (msg: string) => void;
     connect_forbidden: (msg: string) => void;
     connect_serverError: (msg: string) => void;
+    reconnect_failed: () => void;
 }
 
 export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents extends EventMap = {}> {
@@ -36,6 +42,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
     _handlers = new VEE<InputEvents>();
     _manuallyDisconnected: boolean = false;
     _messageQueue: string[] = [];
+    _reconnectAttempts: number = 0;
 
     opts: GLC_Opts;
     url: URL;
@@ -46,10 +53,14 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
         this._ackCallbacks = new Map();
         this.opts = {
             logs: false,
-            reConnect: true,
-            reConnectInterval: 1000,
             token: null,
             autoConnect: true,
+            statusPath: "/gloves-link/status",
+            reConnect: true,
+            reConnectInterval: 1000,
+            maxReConnectAttempts: 5,
+            reConnectBackoffFactor: 2,
+            maxReConnectDelay: 15_000,
             ...opts
         }
 
@@ -71,6 +82,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 
         this._ws.onopen = () => {
             this.connected = true;
+            this._reconnectAttempts = 0;
             if (this.opts.logs) console.log("[ws] Connected");
 
             let msg: string;
@@ -133,7 +145,7 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
             if (this.opts.logs) console.log("[ws] Disconnected", event);
             this._handlersEmit("disconnect", event);
 
-            if (this._manuallyDisconnected) return;
+            if (this._manuallyDisconnected || !this.opts.reConnect) return;
 
             if (event.code === 1006) {
                 if (this.opts.logs) console.log("[ws] Connection closed by server");
@@ -147,11 +159,35 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
                 }
             }
 
-            if (!this.opts.reConnect) return;
+            this._reconnectAttempts++;
+
+            if (this._reconnectAttempts > this.opts.maxReConnectAttempts) {
+                if (this.opts.logs)
+                    console.error(`[ws] Max reconnect attempts reached (${this.opts.maxReConnectAttempts})`);
+
+                this._handlersEmit("reconnect_failed");
+                return;
+            }
+
+            const expDelay = Math.min(
+                this.opts.reConnectInterval * this.opts.reConnectBackoffFactor ** (this._reconnectAttempts - 1),
+                this.opts.maxReConnectDelay
+            );
+
+            const jitter = 1 + Math.random() * 0.5;
+            const delay = Math.max(
+                expDelay * jitter,
+                this.opts.reConnectInterval
+            );
+
+            if (this.opts.logs)
+                console.log(
+                    `[ws] Reconnecting in ${delay.toFixed(0)}ms (attempt ${this._reconnectAttempts})`
+                );
 
             setTimeout(() => {
                 this.connect();
-            }, this.opts.reConnectInterval);
+            }, delay);
         }
     }
 
@@ -209,12 +245,13 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
 }
 
 async function checkStatus(client: GlovesLinkClient, id: string) {
-    const params = new URLSearchParams();
-    params.set("id", id);
-    params.set("path", client.url.pathname);
+    const statusURL = new URL(client.opts.statusPath, client.url.origin);
+    statusURL.searchParams.set("id", id);
+    statusURL.searchParams.set("path", client.url.pathname);
 
-    const statusUrl = client.url.origin + "/gloves-link/status?" + params.toString();
-    const res = await fetch(statusUrl.replace("ws", "http"));
+    const statusUrl = statusURL.toString().replace("ws", "http");
+
+    const res = await fetch(statusUrl);
     if (!res.ok) {
         console.error("[ws] Status error", res.status);
         return true;

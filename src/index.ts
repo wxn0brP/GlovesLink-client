@@ -239,8 +239,6 @@ export class GlovesLinkClient<InputEvents extends EventMap = {}, OutputEvents ex
     _handlersEmit(evtName: string, ...args: any[]) {
         // @ts-ignore
         this._handlers.emit(evtName, ...args);
-        // @ts-ignore
-        this._handlers.emit("*", evtName, ...args);
     }
 }
 

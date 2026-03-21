@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1](https://github.com/wxn0brP/GlovesLink-client/compare/v0.1.0...v0.1.1) (2026-03-21)
+
+
+### Features
+
+* update event emitter ([54753ac](https://github.com/wxn0brP/GlovesLink-client/commit/54753ac99f909c96b2e52a5eb16d538990e85ae7))
+
 ## [0.1.0](https://github.com/wxn0brP/GlovesLink-client/compare/v0.0.14...v0.1.0) (2026-01-30)
 
 

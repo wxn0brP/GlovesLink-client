@@ -18,7 +18,7 @@
         "@types/bun": "*",
         "esbuild": "*",
         "tsc-alias": "*",
-        "typescript": "*"
+        "typescript": "^5"
     },
     "dependencies": {
         "@wxn0brp/event-emitter": "0.0.5"

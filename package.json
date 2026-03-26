@@ -16,12 +16,12 @@
     },
     "devDependencies": {
         "@types/bun": "*",
-        "esbuild": "*",
-        "tsc-alias": "*",
-        "typescript": "*"
+        "esbuild": "~0.27.4",
+        "tsc-alias": "^1",
+        "typescript": "^6"
     },
     "dependencies": {
-        "@wxn0brp/event-emitter": "0.0.5"
+        "@wxn0brp/event-emitter": "~0.0.5"
     },
     "files": [
         "dist"

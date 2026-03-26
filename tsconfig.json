@@ -8,10 +8,12 @@
         "skipLibCheck": true,
         "outDir": "./dist",
         "inlineSourceMap": false,
-        "declaration": true
+        "declaration": true,
+        "rootDir": "./src",
+        "strict": false
     },
     "include": [
-       "./src"
+        "./src"
     ],
     "exclude": [
         "node_modules"

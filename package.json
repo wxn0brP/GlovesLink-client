@@ -19,7 +19,7 @@
         "@wxn0brp/biome": "*",
         "esbuild": "~0.27.4",
         "tsc-alias": "^1",
-        "typescript": "^6"
+        "typescript": "^7.0.0"
     },
     "dependencies": {
         "@wxn0brp/event-emitter": "~0.0.5"

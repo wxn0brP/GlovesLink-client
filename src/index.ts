@@ -267,6 +267,20 @@ export class GlovesLinkClient<
 		// @ts-ignore
 		this._handlers.emit(evtName, ...args);
 	}
+
+	baseOn() {
+		const self = this as any;
+		self.on("connect", () => console.log("[ws] connected"));
+		self.on("disconnect", () => console.log("[ws] disconnected"));
+		self.on("error", e => console.error("[ws] error", e));
+		self.on("connect_forbidden", msg => console.error("[ws] forbidden", msg));
+		self.on("connect_unauthorized", msg =>
+			console.error("[ws] unauthorized", msg),
+		);
+		self.on("connect_serverError", msg =>
+			console.error("[ws] server error", msg),
+		);
+	}
 }
 
 async function checkStatus(client: GlovesLinkClient, id: string) {

@@ -272,13 +272,19 @@ export class GlovesLinkClient<
 		const self = this as any;
 		self.on("connect", () => console.log("[ws] connected"));
 		self.on("disconnect", () => console.log("[ws] disconnected"));
-		self.on("error", e => console.error("[ws] error", e));
+		self.on("error", (...args) => console.error("[ws] error", ...args));
 		self.on("connect_forbidden", msg => console.error("[ws] forbidden", msg));
 		self.on("connect_unauthorized", msg =>
 			console.error("[ws] unauthorized", msg),
 		);
 		self.on("connect_serverError", msg =>
 			console.error("[ws] server error", msg),
+		);
+		self.on("error.valid", (...args) =>
+			console.error("[ws] error valid", ...args),
+		);
+		self.on("error.spam", (...args) =>
+			console.error("[ws] error spam", ...args),
 		);
 	}
 }

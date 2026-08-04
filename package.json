@@ -17,12 +17,12 @@
     "devDependencies": {
         "@types/bun": "*",
         "@wxn0brp/biome": "*",
-        "esbuild": "~0.27.4",
+        "esbuild": "^0.28.1",
         "tsc-alias": "^1",
-        "typescript": "^6"
+        "typescript": "^7"
     },
     "dependencies": {
-        "@wxn0brp/event-emitter": "~0.0.5"
+        "@wxn0brp/event-emitter": "^0.0.5"
     },
     "files": [
         "dist"

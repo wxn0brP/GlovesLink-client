@@ -29,7 +29,7 @@ npm i @wxn0brp/gloves-link-client
 
 ```typescript
 import GlovesLinkClient from '@wxn0brp/gloves-link-client';
-//or browser
+// or browser
 import GlovesLinkClient from 'path/to/your/GlovesLinkClient.js';
 // if you use falcon-frame
 import GlovesLinkClient from '/gloves-link/client';
@@ -37,6 +37,8 @@ import GlovesLinkClient from '/gloves-link/client';
 const client = new GlovesLinkClient('ws://example.com', {
     reConnect: true,
     reConnectInterval: 5000,
+    reConnectBackoffFactor: 2,
+    maxReConnectAttempts: 5,
     logs: true,
     token: 'your-auth-token'
 });
@@ -45,11 +47,35 @@ client.on('connect', () => {
     console.log('Connected to server');
 });
 
+client.on('connect_unauthorized', (msg) => {
+    console.log('Authentication failed:', msg);
+});
+
+client.on('reconnect_failed', () => {
+    console.log('Could not reconnect to server');
+});
+
 client.on('response', (message) => {
     console.log('Response from server:', message);
 });
 
 client.emit('exampleEvent', { hello: 'world' });
+```
+
+For typed events:
+
+```typescript
+type ServerEvents = {
+    message: (text: string) => void;
+}
+
+type ClientEvents = {
+    sendMessage: (text: string) => void;
+}
+
+const client = new GlovesLinkClient<ServerEvents, ClientEvents>('/');
+client.on('message', (text) => console.log(text));
+client.emit('sendMessage', 'Hello!');
 ```
 
 ## License

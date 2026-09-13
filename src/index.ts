@@ -13,6 +13,8 @@ export interface GLC_Opts {
 	maxBufferedAmount: number;
 	/** Note: without jitter */
 	maxReConnectDelay: number;
+	useSSE: boolean;
+	ssePath: string;
 }
 
 export interface GLC_DataEvent {
@@ -41,12 +43,15 @@ export class GlovesLinkClient<
 	OutputEvents extends EventMap = {},
 > {
 	_ws: WebSocket;
+	_sse: EventSource;
+	_sseId: string;
 	_ackIdCounter: number;
 	_ackCallbacks: Map<number, Function>;
 	_handlers = new VEE<InputEvents>();
 	_manuallyDisconnected: boolean = false;
 	_messageQueue: string[] = [];
 	_reconnectAttempts: number = 0;
+	_useSSEMode: boolean = false;
 
 	opts: GLC_Opts;
 	url: URL;
@@ -77,6 +82,8 @@ export class GlovesLinkClient<
 			reConnectBackoffFactor: 2,
 			maxBufferedAmount: 1_048_576,
 			maxReConnectDelay: 15_000,
+			useSSE: false,
+			ssePath: "/gloves-link/sse",
 			...opts,
 		};
 
@@ -111,6 +118,11 @@ export class GlovesLinkClient<
 	}
 
 	connect() {
+		if (this.opts.useSSE) {
+			this.connectSSE();
+			return;
+		}
+
 		this._manuallyDisconnected = false;
 		const id =
 			Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
@@ -236,6 +248,82 @@ export class GlovesLinkClient<
 		};
 	}
 
+	connectSSE() {
+		this._manuallyDisconnected = false;
+		this._useSSEMode = true;
+
+		const sseUrl = new URL(
+			this.opts.ssePath + this.url.pathname,
+			this.url.origin,
+		);
+		if (this.opts.token) sseUrl.searchParams.set("token", this.opts.token);
+		if (this.opts.connectionData) {
+			sseUrl.searchParams.set("data", JSON.stringify(this.opts.connectionData));
+		}
+
+		this._sse = new EventSource(sseUrl.href);
+
+		this._sse.onopen = () => {
+			this.connected = true;
+			this._reconnectAttempts = 0;
+			if (this.opts.logs) console.log("[sse] Connected");
+
+			while (this._messageQueue.length) {
+				const msg = this._messageQueue.shift();
+				this._sendViaHTTP(msg);
+			}
+
+			this._handlersEmit("connect");
+		};
+
+		this._sse.onerror = (err: any) => {
+			if (this.opts.logs) console.warn("[sse] Error:", err);
+			this._handlersEmit("error", err);
+		};
+
+		this._sse.onmessage = (_data: MessageEvent) => {
+			let msg: GLC_DataEvent;
+
+			try {
+				msg = JSON.parse(_data.data);
+			} catch {
+				if (this.opts.logs) console.warn("[sse] Invalid JSON:", _data.data);
+				return;
+			}
+
+			const { evt, data } = msg;
+			if (!evt || (data && !Array.isArray(data))) return;
+
+			this._handlersEmit(evt, ...(data || []));
+		};
+	}
+
+	async _sendViaHTTP(payload: string) {
+		if (!this._sseId) return;
+
+		const postUrl = new URL(
+			this.opts.ssePath + this.url.pathname,
+			this.url.origin,
+		);
+		postUrl.searchParams.set("sseId", this._sseId);
+
+		try {
+			const res = await fetch(postUrl.href, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: payload,
+			});
+
+			if (!res.ok && this.opts.logs) {
+				console.warn("[sse] POST error:", res.status);
+			}
+		} catch (err) {
+			if (this.opts.logs) console.warn("[sse] POST failed:", err);
+		}
+	}
+
 	on<K extends EventName<InputEvents & InternalEvents>>(
 		event: K,
 		listener: (InputEvents & InternalEvents)[K],
@@ -274,9 +362,14 @@ export class GlovesLinkClient<
 			ackI: ackI.length ? ackI : undefined,
 		});
 
-		if (this.connected && this._ws?.readyState === WebSocket.OPEN)
-			this._ws.send(payload);
-		else this._messageQueue.push(payload);
+		if (this._useSSEMode) {
+			if (this.connected) this._sendViaHTTP(payload);
+			else this._messageQueue.push(payload);
+		} else {
+			if (this.connected && this._ws?.readyState === WebSocket.OPEN)
+				this._ws.send(payload);
+			else this._messageQueue.push(payload);
+		}
 	}
 
 	send<K extends EventName<OutputEvents>>(
@@ -288,11 +381,19 @@ export class GlovesLinkClient<
 
 	disconnect() {
 		this._manuallyDisconnected = true;
-		this._ws.close();
+		if (this._useSSEMode && this._sse) {
+			this._sse.close();
+		} else if (this._ws) {
+			this._ws.close();
+		}
 	}
 
 	close() {
-		this._ws.close();
+		if (this._useSSEMode && this._sse) {
+			this._sse.close();
+		} else if (this._ws) {
+			this._ws.close();
+		}
 	}
 
 	_handlersEmit(evtName: string, ...args: any[]) {
@@ -321,7 +422,7 @@ export class GlovesLinkClient<
 	}
 }
 
-async function checkStatus(client: GlovesLinkClient, id: string) {
+async function checkStatus(client: GlovesLinkClient<any, any>, id: string) {
 	const statusURL = new URL(client.opts.statusPath, client.url.origin);
 	statusURL.searchParams.set("id", id);
 	statusURL.searchParams.set("path", client.url.pathname);

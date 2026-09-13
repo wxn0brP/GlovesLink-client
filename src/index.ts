@@ -10,6 +10,7 @@ export interface GLC_Opts {
 	reConnectInterval: number;
 	reConnectBackoffFactor: number;
 	maxReConnectAttempts: number;
+	maxBufferedAmount: number;
 	/** Note: without jitter */
 	maxReConnectDelay: number;
 }
@@ -51,6 +52,17 @@ export class GlovesLinkClient<
 	url: URL;
 	connected: boolean = false;
 
+	volatile: {
+		emit: <K extends EventName<OutputEvents>>(
+			evt: K,
+			...args: EventArgs<OutputEvents, K>
+		) => void;
+		send: <K extends EventName<OutputEvents>>(
+			evt: K,
+			...args: EventArgs<OutputEvents, K>
+		) => void;
+	};
+
 	constructor(url: string, opts: Partial<GLC_Opts> = {}) {
 		this._ackIdCounter = 1;
 		this._ackCallbacks = new Map();
@@ -63,6 +75,7 @@ export class GlovesLinkClient<
 			reConnectInterval: 1000,
 			maxReConnectAttempts: 5,
 			reConnectBackoffFactor: 2,
+			maxBufferedAmount: 1_048_576,
 			maxReConnectDelay: 15_000,
 			...opts,
 		};
@@ -74,6 +87,25 @@ export class GlovesLinkClient<
 				: "ws://localhost",
 		);
 		if (this.opts.token) this.url.searchParams.set("token", this.opts.token);
+
+		this.volatile = {
+			emit: <K extends EventName<OutputEvents>>(
+				evt: K,
+				...args: EventArgs<OutputEvents, K>
+			) => {
+				if (this._ws && this._ws.bufferedAmount > this.opts.maxBufferedAmount)
+					return;
+				this.emit(evt, ...args);
+			},
+			send: <K extends EventName<OutputEvents>>(
+				evt: K,
+				...args: EventArgs<OutputEvents, K>
+			) => {
+				if (this._ws && this._ws.bufferedAmount > this.opts.maxBufferedAmount)
+					return;
+				this.emit(evt, ...args);
+			},
+		};
 
 		if (this.opts.autoConnect) this.connect();
 	}

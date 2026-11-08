@@ -4,10 +4,11 @@ import { isPlainObject, isValidEventName } from "./validation";
 export function openSSE(client: GlovesLinkClient<any, any>) {
 	client._manuallyDisconnected = false;
 	client._useSSEMode = true;
+	client._sseId = null;
 
 	const sseUrl = new URL(
 		client.opts.ssePath + client.url.pathname,
-		client.url.origin,
+		client.url.origin.replace(/^ws/, "http"),
 	);
 	if (client.opts.token) sseUrl.searchParams.set("token", client.opts.token);
 	if (client.opts.connectionData) {
@@ -19,17 +20,14 @@ export function openSSE(client: GlovesLinkClient<any, any>) {
 	client._sse.onopen = () => {
 		client.connected = true;
 		client._reconnectAttempts = 0;
+		client._sseId = null;
 		if (client.opts.logs) console.log("[sse] Connected");
-
-		while (client._messageQueue.length) {
-			const msg = client._messageQueue.shift();
-			postSSE(client, msg);
-		}
 
 		client._handlersEmit("connect");
 	};
 
 	client._sse.onerror = (err: any) => {
+		client._sseId = null;
 		if (client.opts.logs) console.warn("[sse] Error:", err);
 		client._handlersEmit("error", err);
 	};
@@ -40,6 +38,13 @@ export function openSSE(client: GlovesLinkClient<any, any>) {
 			if (!isPlainObject(msg)) return;
 
 			const { evt, data } = msg;
+
+			if (evt === "__sse_id") {
+				client._sseId = data?.[0];
+				if (client._sseId) flushQueue(client);
+				return;
+			}
+
 			if (!isValidEventName(evt)) return;
 			if (data !== undefined && !Array.isArray(data)) return;
 
@@ -50,15 +55,25 @@ export function openSSE(client: GlovesLinkClient<any, any>) {
 	};
 }
 
+function flushQueue(client: GlovesLinkClient<any, any>) {
+	while (client._messageQueue.length) {
+		const msg = client._messageQueue.shift();
+		postSSE(client, msg);
+	}
+}
+
 export async function postSSE(
 	client: GlovesLinkClient<any, any>,
 	payload: string,
 ) {
-	if (!client._sseId) return;
+	if (!client._sseId) {
+		client._messageQueue.push(payload);
+		return;
+	}
 
 	const postUrl = new URL(
 		client.opts.ssePath + client.url.pathname,
-		client.url.origin,
+		client.url.origin.replace(/^ws/, "http"),
 	);
 	postUrl.searchParams.set("sseId", client._sseId);
 

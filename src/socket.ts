@@ -152,6 +152,7 @@ export class GlovesLinkClient<
 	disconnect() {
 		this._manuallyDisconnected = true;
 		if (this._useSSEMode && this._sse) {
+			this._sseId = null;
 			this._sse.close();
 		} else if (this._ws) {
 			this._ws.close();
@@ -160,6 +161,7 @@ export class GlovesLinkClient<
 
 	close() {
 		if (this._useSSEMode && this._sse) {
+			this._sseId = null;
 			this._sse.close();
 		} else if (this._ws) {
 			this._ws.close();

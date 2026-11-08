@@ -38,6 +38,48 @@ export type InternalEvents = {
 	reconnect_failed: () => void;
 };
 
+const EVENT_NAME_RE = /^[A-Za-z0-9_.:-]{1,64}$/;
+const RESERVED_EVENTS = new Set([
+	"__proto__",
+	"constructor",
+	"prototype",
+	"hasOwnProperty",
+	"isPrototypeOf",
+	"propertyIsEnumerable",
+	"toLocaleString",
+	"toString",
+	"valueOf",
+	"__defineGetter__",
+	"__defineSetter__",
+	"__lookupGetter__",
+	"__lookupSetter__",
+	"connect",
+	"disconnect",
+]);
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidEventName(evt: unknown): evt is string {
+	return (
+		typeof evt === "string" &&
+		EVENT_NAME_RE.test(evt) &&
+		!RESERVED_EVENTS.has(evt)
+	);
+}
+
+function normalizeAckIndexes(ackI: unknown, dataLength: number): number[] {
+	if (!Array.isArray(ackI)) return [];
+	return ackI.filter(
+		index =>
+			typeof index === "number" &&
+			Number.isInteger(index) &&
+			index >= 0 &&
+			index < dataLength,
+	);
+}
+
 export class GlovesLinkClient<
 	InputEvents extends EventMap = {},
 	OutputEvents extends EventMap = {},
@@ -156,35 +198,38 @@ export class GlovesLinkClient<
 
 		this._ws.onmessage = _data => {
 			const raw = _data?.data?.toString() || _data?.toString() || "";
-			let msg: GLC_DataEvent | GLC_AckEvent;
 
 			try {
-				msg = JSON.parse(raw);
-			} catch {
-				if (this.opts.logs) console.warn("[ws] Invalid JSON:", raw);
-				return;
-			}
-
-			if ("ack" in msg) {
-				const ackId = msg.ack;
-				const ackCallback = this._ackCallbacks.get(ackId);
-				if (ackCallback) {
-					this._ackCallbacks.delete(ackId);
-					ackCallback(...msg.data);
+				const msg = JSON.parse(raw);
+				if (!isPlainObject(msg)) {
+					if (this.opts.logs) console.warn("[ws] Invalid message:", raw);
+					return;
 				}
-				return;
-			}
 
-			const { evt, data, ackI } = msg;
-			if (!evt || (data && !Array.isArray(data))) return;
+				if ("ack" in msg) {
+					const ackId = msg.ack;
+					if (!Number.isInteger(ackId) || !Array.isArray(msg.data)) return;
 
-			if (Array.isArray(ackI)) {
-				for (let i = 0; i < ackI.length; i++) {
-					const ackIndex = ackI[i];
-					if (!data[ackIndex]) break;
+					const ackCallback = this._ackCallbacks.get(ackId);
+					if (ackCallback) {
+						this._ackCallbacks.delete(ackId);
+						ackCallback(...msg.data);
+					}
+					return;
+				}
 
-					const ackId = data[ackIndex];
-					data[ackIndex] = (...res: any) => {
+				const { evt, data, ackI } = msg;
+				if (!isValidEventName(evt)) return;
+				if (data !== undefined && !Array.isArray(data)) return;
+
+				const args: any[] = data ?? [];
+				const ackIndexes = normalizeAckIndexes(ackI, args.length);
+				for (let i = 0; i < ackIndexes.length; i++) {
+					const ackIndex = ackIndexes[i];
+					const ackId = args[ackIndex];
+					if (typeof ackId !== "number") continue;
+
+					args[ackIndex] = (...res: any[]) => {
 						this._ws.send(
 							JSON.stringify({
 								ack: ackId,
@@ -193,9 +238,11 @@ export class GlovesLinkClient<
 						);
 					};
 				}
-			}
 
-			this._handlersEmit(evt, ...data);
+				this._handlersEmit(evt, ...args);
+			} catch {
+				if (this.opts.logs) console.warn("[ws] Invalid message:", raw);
+			}
 		};
 
 		this._ws.onclose = async (event: CloseEvent) => {
@@ -282,19 +329,18 @@ export class GlovesLinkClient<
 		};
 
 		this._sse.onmessage = (_data: MessageEvent) => {
-			let msg: GLC_DataEvent;
-
 			try {
-				msg = JSON.parse(_data.data);
+				const msg = JSON.parse(_data.data);
+				if (!isPlainObject(msg)) return;
+
+				const { evt, data } = msg;
+				if (!isValidEventName(evt)) return;
+				if (data !== undefined && !Array.isArray(data)) return;
+
+				this._handlersEmit(evt, ...(data ?? []));
 			} catch {
 				if (this.opts.logs) console.warn("[sse] Invalid JSON:", _data.data);
-				return;
 			}
-
-			const { evt, data } = msg;
-			if (!evt || (data && !Array.isArray(data))) return;
-
-			this._handlersEmit(evt, ...(data || []));
 		};
 	}
 
